@@ -62,7 +62,7 @@ class MajorDomoClient(object):
         request = [MDP.C_CLIENT, service] + request
         if self.verbose:
             logging.warn("I: send request to '%s' service: ", service)
-            dump(request)
+            dump("Request >>>>{}".format(request))
         reply = None
 
         retries = self.retries
@@ -77,7 +77,7 @@ class MajorDomoClient(object):
                 msg = self.client.recv_multipart()
                 if self.verbose:
                     logging.info("I: received reply:")
-                    dump(msg)
+                    dump("Recived <<<{}".format(msg))
 
                 # Don't try to handle errors, just assert noisily
                 assert len(msg) >= 3

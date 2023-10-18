@@ -19,7 +19,7 @@ import zmq
 import MDP
 #from zhelpers import dump
 def dump(any):
-    print(any)
+    #print(any)
     pass
 class Service(object):
     """a single Service"""
@@ -31,6 +31,11 @@ class Service(object):
         self.name = name
         self.requests = []
         self.waiting = []
+        pass
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
 class Worker(object):
     """a Worker, idle or active"""
@@ -43,6 +48,12 @@ class Worker(object):
         self.identity = identity
         self.address = address
         self.expiry = time.time() + 1e-3*lifetime
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
 
 class MajorDomoBroker(object):
     """
@@ -77,7 +88,7 @@ class MajorDomoBroker(object):
         self.verbose = verbose
         self.services = {}
         self.workers = {}
-        self.waiting = []
+        self.waiting = [] #All alived worker in herer !!!!!
         self.heartbeat_at = time.time() + 1e-3*self.HEARTBEAT_INTERVAL
         self.ctx = zmq.Context()
         self.socket = self.ctx.socket(zmq.ROUTER)
@@ -120,7 +131,14 @@ class MajorDomoBroker(object):
 
             self.purge_workers()
             self.send_heartbeats()
-
+    def get_activate_worker_service(self):
+        res = []
+        for worker  in self.workers.values():
+            now = time.time()
+            if worker.expiry > now:  # worker is not outdate
+                res.append(worker.service.name)
+        return  res
+        pass
     def destroy(self):
         """Disconnect all workers, destroy context."""
         while self.workers:
@@ -137,7 +155,7 @@ class MajorDomoBroker(object):
         if service.startswith(self.INTERNAL_SERVICE_PREFIX):
             self.service_internal(service, msg)
         else:
-            self.dispatch(self.require_service(service), msg)
+            self.dispatch(self.require_service_client(service), msg,service)
 
 
     def process_worker(self, sender, msg):
@@ -148,7 +166,7 @@ class MajorDomoBroker(object):
 
         worker_ready = hexlify(sender) in self.workers
 
-        worker = self.require_worker(sender)
+        worker = self.require_worker(sender)# 通过sender id 找到worker实例
 
         if (MDP.W_READY == command):
             assert len(msg) >= 1 # At least, a service name
@@ -193,18 +211,24 @@ class MajorDomoBroker(object):
 
         if worker.service is not None:
             worker.service.waiting.remove(worker)
+
+
         self.workers.pop(worker.identity)
+        #update services names
 
     def require_worker(self, address):
         """Finds the worker (creates if necessary)."""
+        print("sender:",address)
         assert (address is not None)
         identity = hexlify(address)
         worker = self.workers.get(identity)
         if (worker is None):
             worker = Worker(identity, address, self.HEARTBEAT_EXPIRY)
+            print(worker)
             self.workers[identity] = worker
             if self.verbose:
                 logging.info("I: registering new worker: %s", identity)
+                logging.info("I: After registering new worker {}  ".format(self.workers ))
 
         return worker
 
@@ -215,8 +239,23 @@ class MajorDomoBroker(object):
         if (service is None):
             service = Service(name)
             self.services[name] = service
+            logging.info("I: After require_service new services:{} !".format(self.services.keys()))
 
         return service
+
+    def require_service_client(self, name):
+        """Locates the service (creates if necessary)."""
+        assert (name is not None)
+        service = self.services.get(name)
+        if service ==None:
+            return None
+        services = self.services.keys()
+        if len(services) and service.name  in services:
+            return service
+        else :
+            return None
+
+
 
     def bind(self, endpoint):
         """Bind broker to endpoint, can call this multiple times.
@@ -251,26 +290,53 @@ class MajorDomoBroker(object):
 
         Workers are oldest to most recent, so we stop at the first alive worker.
         """
-        while self.waiting:
-            w = self.waiting[0]
-            if w.expiry < time.time():
+        print('enter purge_workers services:{}'.format(self.services.keys()))
+        #while len(self.waiting)>0:
+        for i ,w  in enumerate(self.waiting):
+            #w = self.waiting[0]
+            now = time.time()
+            print("name {} expir{} now:{}".format(w.identity,w.expiry,now))
+            if w.expiry < now:
                 logging.info("I: deleting expired worker: %s", w.identity)
                 self.delete_worker(w,False)
-                self.waiting.pop(0)
-            else:
-                break
+                self.waiting.pop(i)
+                if w.identity in self.workers.keys():
+                    self.workers.pop(w.identity)
+
+            # else:
+            #     break
+
+        self.services = {}  # reset services
+        for i,w in enumerate(self.waiting) :
+            self.services[w.service.name] = w.service
+
+        print('after purge_workersupdate uppdate services:{}'.format(self.services.keys()))
 
     def worker_waiting(self, worker):
         """This worker is now waiting for work."""
         # Queue to broker and service waiting lists
+        logging.info("I: append   worker: %s", worker.identity)
         self.waiting.append(worker)
         worker.service.waiting.append(worker)
         worker.expiry = time.time() + 1e-3*self.HEARTBEAT_EXPIRY
         self.dispatch(worker.service, None)
 
-    def dispatch(self, service, msg):
+    def dispatch(self, service, msg,service_name = None):
         """Dispatch requests to waiting workers as possible"""
-        assert (service is not None)
+
+        ###############################add new ################
+
+        if service is None   :  # If there have not this worker ,sending a msg to clent and return ;
+            client = msg.pop(0)
+            empty = msg.pop(0)  # ?
+            msg = [client, b'', MDP.C_CLIENT, service_name] + [b"Not this worker"]
+            self.socket.send_multipart(msg)
+            return
+            pass
+        #else service is not Noe
+        # assert (service is not None)
+
+        ############################
         if msg is not None:# Queue message if any
             service.requests.append(msg)
         self.purge_workers()

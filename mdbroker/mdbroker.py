@@ -149,13 +149,13 @@ class MajorDomoBroker(object):
     def process_client(self, sender, msg):
         """Process a request coming from a client."""
         assert len(msg) >= 2 # Service name + body
-        service = msg.pop(0)
+        service_name = msg.pop(0)
         # Set reply return address to client sender
         msg = [sender, b''] + msg
-        if service.startswith(self.INTERNAL_SERVICE_PREFIX):
-            self.service_internal(service, msg)
+        if service_name.startswith(self.INTERNAL_SERVICE_PREFIX):
+            self.service_internal(service_name, msg)
         else:
-            self.dispatch(self.require_service_client(service), msg,service)
+            self.dispatch(self.require_service_client(service_name), msg,service_name)
 
 
     def process_worker(self, sender, msg):
@@ -244,6 +244,7 @@ class MajorDomoBroker(object):
         return service
 
     def require_service_client(self, name):
+        """Get service class by service name !"""
         """Locates the service (creates if necessary)."""
         assert (name is not None)
         service = self.services.get(name)

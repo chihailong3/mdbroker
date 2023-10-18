@@ -13,7 +13,7 @@ from mdcliapi import MajorDomoClient
 services = [b"echo1122",b"echo11"]
 def main():
     verbose = '-v' in sys.argv
-    client = MajorDomoClient("tcp://192.168.117.105:5555", verbose)
+    client = MajorDomoClient("tcp://192.168.117.106:5555", verbose)
     count = 0
     while count < 10000:
         request = b"Hello world"

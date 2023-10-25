@@ -10,7 +10,7 @@ from mdwrkapi import MajorDomoWorker
 
 def main():
     verbose = '-v' in sys.argv
-    worker = MajorDomoWorker("tcp://192.168.117.105:5555", b"echo1122", verbose)
+    worker = MajorDomoWorker("tcp://192.168.117.106:5555", b"echo1122", verbose)
     reply = None
     while True:
         request = worker.recv(reply)

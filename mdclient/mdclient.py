@@ -17,6 +17,7 @@ def main():
     count = 0
     while count < 10000:
         request = b"Hello world"
+        request = b"Hello"*40
         i = random.randint(0,1)
         try:
             reply = client.send(services[i], request)

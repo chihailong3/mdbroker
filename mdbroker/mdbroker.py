@@ -244,6 +244,7 @@ class MajorDomoBroker(object):
         return service
 
     def require_service_client(self, name):
+        """A queue composed of many workers under each service class"""
         """Get service class by service name !"""
         """Locates the service (creates if necessary)."""
         assert (name is not None)
@@ -296,14 +297,13 @@ class MajorDomoBroker(object):
         for i ,w  in enumerate(self.waiting):
             #w = self.waiting[0]
             now = time.time()
-            print("name {} expir{} now:{}".format(w.identity,w.expiry,now))
+            #print("name {} expir{} now:{}".format(w.identity,w.expiry,now))
             if w.expiry < now:
                 logging.info("I: deleting expired worker: %s", w.identity)
                 self.delete_worker(w,False)
                 self.waiting.pop(i)
                 if w.identity in self.workers.keys():
                     self.workers.pop(w.identity)
-
             # else:
             #     break
 
@@ -341,7 +341,7 @@ class MajorDomoBroker(object):
         if msg is not None:# Queue message if any
             service.requests.append(msg)
         self.purge_workers()
-        while service.waiting and service.requests:
+        while service.waiting and service.requests: #worker  and  work
             msg = service.requests.pop(0)
             worker = service.waiting.pop(0)
             self.waiting.remove(worker)

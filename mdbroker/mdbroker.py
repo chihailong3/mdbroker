@@ -324,9 +324,16 @@ class MajorDomoBroker(object):
 
     def dispatch(self, service, msg,service_name = None):
         """Dispatch requests to waiting workers as possible"""
-
         ###############################add new ################
-
+        if service is None and service_name== b'askService':
+            client = msg.pop(0)
+            empty = msg.pop(0)  # ?
+            services = (self.services.keys())
+            bservices = bytes('{}'.format(services),'utf-8')
+            msg = [client, b'', MDP.C_CLIENT, service_name] + [bservices]
+            self.socket.send_multipart(msg)
+            return
+            pass
         if service is None   :  # If there have not this worker ,sending a msg to clent and return ;
             client = msg.pop(0)
             empty = msg.pop(0)  # ?
@@ -349,7 +356,6 @@ class MajorDomoBroker(object):
 
     def send_to_worker(self, worker, command, option, msg=None):
         """Send message to worker.
-
         If message is provided, sends that message.
         """
 

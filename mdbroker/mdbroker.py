@@ -71,6 +71,7 @@ class MajorDomoBroker(object):
 
     ctx = None # Our context
     socket = None # Socket for clients & workers
+    ipcsocket = None  # Socket for ipc in same machine
     poller = None # our Poller
 
     heartbeat_at = None# When to send HEARTBEAT
@@ -92,14 +93,13 @@ class MajorDomoBroker(object):
         self.heartbeat_at = time.time() + 1e-3*self.HEARTBEAT_INTERVAL
         self.ctx = zmq.Context()
         self.socket = self.ctx.socket(zmq.ROUTER)
+        self.ipcsocket = self.ctx.socket(zmq.SUB)
         self.socket.linger = 0
         self.poller = zmq.Poller()
         self.poller.register(self.socket, zmq.POLLIN)
         logging.basicConfig(format="%(asctime)s %(message)s",
                             datefmt="%Y-%m-%d %H:%M:%S",
                             level=logging.INFO)
-
-
 
     # ---------------------------------------------------------------------
 
@@ -110,6 +110,7 @@ class MajorDomoBroker(object):
                 items = self.poller.poll(self.HEARTBEAT_INTERVAL)
             except KeyboardInterrupt:
                 break # Interrupted
+            
             if items:
                 msg = self.socket.recv_multipart()
                 if self.verbose:
@@ -266,6 +267,9 @@ class MajorDomoBroker(object):
         """
         self.socket.bind(endpoint)
         logging.info("I: MDP broker/0.1.1 is active at %s", endpoint)
+        ipc_endpoint = "ipc:///VCserver/ddd/0"
+        #self.ipcsocket.bind(ipc_endpoint)
+        #logging.info("I: MDP broker/0.1.1 is active at %s", ipc_endpoint)
 
     def service_internal(self, service, msg):
         """Handle internal service according to 8/MMI specification"""
@@ -328,8 +332,8 @@ class MajorDomoBroker(object):
         if service is None and service_name== b'askService':
             client = msg.pop(0)
             empty = msg.pop(0)  # ?
-            services = (self.services.keys())
-            bservices = bytes('{}'.format(services),'utf-8')
+
+            bservices = bytes('{}'.format(self.services),'utf-8')
             msg = [client, b'', MDP.C_CLIENT, service_name] + [bservices]
             self.socket.send_multipart(msg)
             return
